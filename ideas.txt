@@ -1,0 +1,49 @@
+Roam - a direct p2p, easy setup and secure VPN
+The purpose of Roam is to allow quick setup of direct encrypted connections between multiple endpoints.
+
+Unlike something such as OpenVPN, Roam connects directly to each endpoint, rather than going through one "server" machine.
+This means 
+
+Every network is identified by a randomly generated shared secret. This secret is used to authenticate new machines, and
+a hashed version of it is used for machines to find each other. This is in contrast to something like OpenVPN, where a
+shared secret might be used for a single point-to-point connection, but normally certificates are used.
+
+It is assumed every node on the network is trusted, as long as the shared secret is known. This means when a new node joins
+a network, it is automatically accepted by all other nodes without a prompt.
+
+When a new node wants to join a network, it takes a shared secret and hashes it with RIPEMD160. Using this hash, either a bittorrent
+tracker or DHT is queried for this hash, and peers are returned. The node only needs to connect to one peer to register with the network.
+
+Crypto
+---
+All connections have PFS, where DH keys are tagged with a MAC. The key in this MAC is the shared secret. This means each connection
+will have its own encryption key, and knowledge of the shared secret won't cause the traffic to be readable.
+Based on CPU support for hardware AES acceleration, connection negotiation will automatically pick between AES-OCB or Chacha20-Poly1305.
+
+Network secrets are made up of ed25519 keypairs. The private key gives you control over the network, the public key lets you access the network.
+Alternatively, you can create a network secret with no private key and any arbitrary access key - this just means you won't be able to
+change its settings or otherwise control it.
+
+Workflow
+---
+Ideally, one machine should be able to run:
+    ./roam new
+to create a new VPN network. Some questions would need to be asked, which would look like:
+
+     $ ./roam new
+    To set up your network, we need to ask a few questions first.
+
+    What should this network be called?
+    > NewNetwork
+
+    What subnet should be used for this network? (or leave blank for 192.168.251.0/24)
+    > 10.4.0.0/16
+
+    Your new network access key is: ml0Pm4ie8ZL81DdFmft5x2rNfy2Xgl534CKs1ObBb-0
+    To connect to this network, run the command: ./roam connect ml0Pm4ie8ZL81DdFmft5x2rNfy2Xgl534CKs1ObBb-0
+
+Then on another machine, run the command:
+    ./roam connect ml0Pm4ie8ZL81DdFmft5x2rNfy2Xgl534CKs1ObBb-0
+and both machines will now be connected with a point-to-point tunnel.
+
+As more machines run that command, the tunnel becomes a larger mesh network.

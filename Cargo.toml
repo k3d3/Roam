@@ -1,0 +1,18 @@
+[package]
+name = "roam"
+version = "0.1.0"
+authors = ["main"]
+
+[dependencies]
+clap = "2.21.0"
+futures = "0.1"
+tokio-core = "0.1"
+tokio-service = "0.1"
+tokio-proto = "0.1"
+error-chain = "0.10.0"
+serde = "0.9"
+serde_derive = "0.9"
+serde_json = "0.9"
+rand = "0.3.15"
+base64 = "0.4.0"
+rust-crypto = "0.2.36"
