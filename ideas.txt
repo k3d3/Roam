@@ -47,3 +47,25 @@ Then on another machine, run the command:
 and both machines will now be connected with a point-to-point tunnel.
 
 As more machines run that command, the tunnel becomes a larger mesh network.
+
+---
+
+As of now, a sample network JSON file would look something like:
+
+    config json: {
+      "name": "NewNetwork",
+      "key": "ml0Pm4ie8ZL81DdFmft5x2rNfy2Xgl534CKs1ObBb-0:T4SW7Ap-VIBUzjgtLkis4WKIE3M2Ozd4m0PGbWkqdIeaXQ-biJ7xkvzUN0WZ-3nHas1_LZeCXnfgIqzU5sFv7Q",
+      "network_addr": "10.4.0.0",
+      "cidr": 16
+    }
+
+In this case, a key contains both an access key and a secret key. This means this node can control the network. If alternatively the JSON file looked like:
+
+    config json: {
+      "name": "NewNetwork",
+      "key": "ml0Pm4ie8ZL81DdFmft5x2rNfy2Xgl534CKs1ObBb-0",
+      "network_addr": "10.4.0.0",
+      "cidr": 16
+    }
+
+then the node could only access the network, not control it.
