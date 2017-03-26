@@ -25,11 +25,11 @@ use errors::*;
 #[derive(Debug)]
 pub struct NetworkKey {
     pub access_key: Vec<u8>,
-    pub secret_key: Option<Vec<u8>>
+    pub secret_key: Option<Vec<u8>>,
 }
 
 impl Serialize for NetworkKey {
-    fn serialize<S>(&self, serializer: S) -> stdResult<S::Ok, S::Error> 
+    fn serialize<S>(&self, serializer: S) -> stdResult<S::Ok, S::Error>
         where S: Serializer
     {
         let access_key_base64 = base64::encode_config(&self.access_key, base64::URL_SAFE_NO_PAD);
@@ -46,6 +46,7 @@ impl Serialize for NetworkKey {
         } else {
             serializer.serialize_str(&access_key_base64)
         }
+
     }
 }
 
@@ -55,41 +56,26 @@ impl Deserialize for NetworkKey {
     {
         use self::serde::de::Error;
 
-        String::deserialize(deserializer)
-            .and_then(|string| {
-                let mut keys = string.split(":")
-                .flat_map(|key| base64::decode_config(key, base64::URL_SAFE_NO_PAD));
-                if let Some(access_key) = keys.next() {
-                    Ok(NetworkKey{ access_key: access_key, secret_key: keys.next() })
-                } else {
-                    Err(Error::custom("Failed to deserialize access key"))
-                }
-            })
+        String::deserialize(deserializer).and_then(|string| {
+            let mut keys = string.split(":").flat_map(|key| base64::decode_config(key, base64::URL_SAFE_NO_PAD));
+            if let Some(access_key) = keys.next() {
+                Ok(NetworkKey {
+                       access_key: access_key,
+                       secret_key: keys.next(),
+                   })
+            } else {
+                Err(Error::custom("Failed to deserialize access key"))
+            }
+        })
     }
 }
-
-/*fn as_base64<S>(key: &PublicKey, serializer: &mut S) -> Result<(), S::Error>
-    where S: Serializer
-{
-    serializer.serialize_str(&base64::encode(&key[..]))
-}
-
-fn from_base64<D>(deserializer: &mut D) -> Result<PublicKey, D::Error>
-    where D: Deserializer
-{
-    use serde::de::Error;
-    String::deserialize(deserializer)
-        .and_then(|string| base64::decode(&string).map_err(|err| Error::custom(err.to_string())))
-        .map(|bytes| PublicKey::from_slice(&bytes))
-        .and_then(|opt| opt.ok_or_else(|| Error::custom("failed to deserialize public key")))
-}*/
 
 #[derive(Debug, Serialize)]
 pub struct NetworkConfig {
     pub name: String,
     pub key: NetworkKey,
     pub network_addr: IpAddr,
-    pub cidr: u8
+    pub cidr: u8,
 }
 
 fn generate_secret_key() -> NetworkKey {
@@ -98,10 +84,13 @@ fn generate_secret_key() -> NetworkKey {
     let mut seed: [u8; 32] = [0; 32];
 
     rng.fill_bytes(&mut seed);
-    
+
     let (secret_key, access_key) = ed25519::keypair(&seed);
-    
-    NetworkKey { access_key: access_key.to_vec(), secret_key: Some(secret_key.to_vec()) }
+
+    NetworkKey {
+        access_key: access_key.to_vec(),
+        secret_key: Some(secret_key.to_vec()),
+    }
 }
 
 fn string_to_ip_cidr(input: &str) -> Result<Option<(IpAddr, u8)>> {
@@ -142,9 +131,8 @@ pub fn new_network_prompt() -> Result<NetworkConfig> {
         bail!("A network name needs to be provided.");
     }
 
-    let (ip_addr, cidr) = string_to_ip_cidr(
-        &question_prompt("What subnet should be used for this network? (or leave blank for 192.168.251.0/24)")?
-    )?.unwrap_or((IpAddr::V4(Ipv4Addr::new(192, 168, 251, 0)), 24));
+    let (ip_addr, cidr) =
+        string_to_ip_cidr(&question_prompt("What subnet should be used for this network? (or leave blank for 192.168.251.0/24)")?)?.unwrap_or((IpAddr::V4(Ipv4Addr::new(192, 168, 251, 0)), 24));
 
     let network_key = generate_secret_key();
 
@@ -152,13 +140,12 @@ pub fn new_network_prompt() -> Result<NetworkConfig> {
            name: name,
            network_addr: ip_addr,
            key: network_key,
-           cidr: cidr
+           cidr: cidr,
        })
 }
 
 pub fn save_network_config(config: NetworkConfig) -> Result<()> {
-    let config_json =
-        serde_json::to_string_pretty(&config).chain_err(|| "Could not save network config")?;
+    let config_json = serde_json::to_string_pretty(&config).chain_err(|| "Could not save network config")?;
     println!("config json: {}", config_json);
     Ok(())
 }
@@ -178,7 +165,10 @@ mod test {
         let a = input.split(":");
         let mut b = a.flat_map(|x| base64::decode_config(x, base64::URL_SAFE_NO_PAD).ok());
         if let Some(x) = b.next() {
-            let net_key = NetworkKey{ access_key: x, secret_key: b.next() };
+            let net_key = NetworkKey {
+                access_key: x,
+                secret_key: b.next(),
+            };
             println!("{:?}", net_key);
         }
     }
@@ -189,7 +179,10 @@ mod test {
         let a = input.split(":");
         let mut b = a.flat_map(|x| base64::decode_config(x, base64::URL_SAFE_NO_PAD).ok());
         if let Some(x) = b.next() {
-            let net_key = NetworkKey{ access_key: x, secret_key: b.next() };
+            let net_key = NetworkKey {
+                access_key: x,
+                secret_key: b.next(),
+            };
             println!("{:?}", net_key);
         }
     }
