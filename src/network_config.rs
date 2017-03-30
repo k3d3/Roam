@@ -39,7 +39,7 @@ pub struct NetworkConfig {
 }
 
 /// A network key is used to connect to or control a network.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct NetworkKey {
     /// The access key allows you to access the network.
     pub access_key: Vec<u8>,
@@ -50,6 +50,10 @@ pub struct NetworkKey {
 impl NetworkConfig {
     /// Convert a NetworkConfig to JSON format, to be saved as a config file.
     pub fn to_json(&self) -> Result<String> {
+        serde_json::to_string(&self).chain_err(|| "Could not serialize network config")
+    }
+
+    pub fn to_pretty_json(&self) -> Result<String> {
         serde_json::to_string_pretty(&self).chain_err(|| "Could not serialize network config")
     }
 }
@@ -76,6 +80,7 @@ impl ToString for NetworkKey {
 impl FromStr for NetworkKey {
     type Err = Error;
     fn from_str(s: &str) -> stdResult<Self, Self::Err> {
+        // TODO: pass through base64 errors instead of casting to option
         let mut keys = s.split(':')
             .flat_map(|key| base64::decode_config(key, base64::URL_SAFE_NO_PAD));
         if let Some(access_key) = keys.next() {
@@ -149,7 +154,7 @@ pub fn string_to_ip_cidr(input: &str) -> Result<Option<(IpAddr, u8)>> {
 
         let cidr_string = input_parts.next().ok_or("CIDR not provided")?;
         let cidr: u8 = cidr_string.parse().chain_err(|| "Could not parse CIDR")?;
-        if cidr > 30 {
+        if (ip_addr.is_ipv4() && cidr > 30) || (ip_addr.is_ipv6() && cidr > 126) {
             bail!("Invalid CIDR subnet")
         }
 
@@ -198,23 +203,104 @@ mod test {
 
     #[test]
     fn serialize_network_key() {
-        let access_input = NetworkKey{ access_key: vec![105, 199, 44], secret_key: None };
-        assert!(access_input.to_string() == "accs");
-
-        let secret_input = NetworkKey{ access_key: vec![105, 199, 44], secret_key: Some(vec![177, 202, 237]) };
-        assert!(secret_input.to_string() == "accs:scrt");
+        let access_network_key = NetworkKey{ access_key: vec![105, 199, 44], secret_key: None };
+        assert!(access_network_key.to_string() == "accs");
+        let secret_network_key = NetworkKey{ access_key: vec![105, 199, 44], secret_key: Some(vec![177, 202, 237]) };
+        assert!(secret_network_key.to_string() == "accs:scrt");
     }
 
     #[test]
     fn deserialize_network_key() {
+        let access_network_key = NetworkKey{ access_key: vec![105, 199, 44], secret_key: None };
         let access_key = "accs";
+        let access_output: NetworkKey = access_key.parse().unwrap();
+        assert!(access_output == access_network_key);
 
+        let secret_network_key = NetworkKey{ access_key: vec![105, 199, 44], secret_key: Some(vec![177, 202, 237]) };
         let secret_key = "accs:scrt";
+        let secret_output: NetworkKey = secret_key.parse().unwrap();
+        assert!(secret_output == secret_network_key);
     }
 
     #[test]
-    fn blah_deserialize() {
-
+    #[should_panic]
+    fn deserialize_network_key_fail_1() {
+        let access_key = "bad!";
+        let _: NetworkKey = access_key.parse().unwrap();
     }
 
+    #[test]
+    #[should_panic]
+    fn deserialize_network_key_fail_2() {
+        let secret_key = "bad!:alsobad!";
+        let _: NetworkKey = secret_key.parse().unwrap();
+    }
+
+    #[test]
+    fn generate_network_key_with_rng() {
+        let input = generate_secret_key();
+        let serialized = input.to_string();
+        let output: NetworkKey = serialized.parse().unwrap();
+        assert!(input == output);
+    }
+
+    #[test]
+    fn serialize_ip_cidr() {
+        // Do two unwraps - one for the Result, one for the Option
+        let (ip, cidr) = string_to_ip_cidr("192.168.1.1/24").unwrap().unwrap();
+
+        assert!(ip.to_string() == "192.168.1.1");
+        assert!(cidr == 24);
+    }
+
+    #[test]
+    #[should_panic]
+    fn serialize_ip_cidr_fail_cidr_v4() {
+        string_to_ip_cidr("192.168.1.1/64").unwrap();
+    }
+
+    #[test]
+    fn serialize_ip_cidr_v6() {
+        let (ip, cidr) = string_to_ip_cidr("fe80::1/64").unwrap().unwrap();
+
+        assert!(ip.to_string() == "fe80::1");
+        assert!(cidr == 64);
+    }
+
+    #[test]
+    #[should_panic]
+    fn serialize_ip_cidr_fail_cidr_v6() {
+        string_to_ip_cidr("fe80::1/130").unwrap();
+    }
+
+    #[test]
+    fn serialize_network_config_v4() {
+        let (ip, cidr) = string_to_ip_cidr("192.168.1.1/24").unwrap().unwrap();
+        let access_network_key = NetworkKey{ access_key: vec![105, 199, 44], secret_key: None };
+        let input = NetworkConfig {
+            name: "TestName".to_string(),
+            key: access_network_key,
+            network_addr: ip,
+            cidr: cidr
+        };
+        let json = input.to_json().unwrap();
+        let expected_json = r#"{"name":"TestName","key":"accs","network_addr":"192.168.1.1","cidr":24}"#;
+        assert!(json == expected_json);
+    }
+
+    #[test]
+    fn serialize_network_config_v6() {
+        let (ip, cidr) = string_to_ip_cidr("fe80::1/64").unwrap().unwrap();
+        let access_network_key = NetworkKey{ access_key: vec![105, 199, 44], secret_key: None };
+        let input = NetworkConfig {
+            name: "TestName".to_string(),
+            key: access_network_key,
+            network_addr: ip,
+            cidr: cidr
+        };
+        let json = input.to_json().unwrap();
+        println!("{}", json);
+        let expected_json = r#"{"name":"TestName","key":"accs","network_addr":"fe80::1","cidr":64}"#;
+        assert!(json == expected_json);
+    }
 }
