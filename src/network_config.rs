@@ -84,7 +84,7 @@ impl FromStr for NetworkKey {
                 secret_key: keys.next()
             })
         } else {
-            Err("Failed to deserialize access key".into())
+            Err("failed to deserialize access key".into())
         }
     }
 }
@@ -101,22 +101,7 @@ impl Serialize for NetworkKey {
     fn serialize<S>(&self, serializer: S) -> stdResult<S::Ok, S::Error>
         where S: Serializer
     {
-        let access_key_base64 = base64::encode_config(&self.access_key, base64::URL_SAFE_NO_PAD);
-        match self.secret_key {
-            Some(ref sec_key) => {
-                let secret_key_base64 = base64::encode_config(&sec_key[..], base64::URL_SAFE_NO_PAD);
-                let output_str = {
-                    let mut mut_output_str = String::with_capacity(access_key_base64.len() + secret_key_base64.len() + 1);
-                    mut_output_str.push_str(&access_key_base64);
-                    mut_output_str.push(':');
-                    mut_output_str.push_str(&secret_key_base64);
-                    mut_output_str
-                };
-                serializer.serialize_str(&output_str)
-            }
-            _ => serializer.serialize_str(&access_key_base64),
-        }
-
+        serializer.serialize_str(&self.to_string())
     }
 }
 
@@ -128,15 +113,7 @@ impl Deserialize for NetworkKey {
         use serde::de::Error;
 
         String::deserialize(deserializer).and_then(|string| {
-            let mut keys = string.split(':').flat_map(|key| base64::decode_config(key, base64::URL_SAFE_NO_PAD));
-            if let Some(access_key) = keys.next() {
-                Ok(NetworkKey {
-                       access_key: access_key,
-                       secret_key: keys.next(),
-                   })
-            } else {
-                Err(Error::custom("Failed to deserialize access key"))
-            }
+            string.parse().map_err(Error::custom)
         })
     }
 }
@@ -230,7 +207,9 @@ mod test {
 
     #[test]
     fn deserialize_network_key() {
+        let access_key = "accs";
 
+        let secret_key = "accs:scrt";
     }
 
     #[test]
